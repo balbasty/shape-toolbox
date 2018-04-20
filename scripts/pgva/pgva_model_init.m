@@ -78,11 +78,21 @@ function [dat, model] = pgva_model_init(dat, model, opt)
     
     % Mixture weight
     % --------------
-    model.mixreg.w = [model.mixreg.a (1-model.mixreg.a)];
-    if opt.optimise.mixreg.w
-        model.lb.wr.val  = 0;
-        model.lb.wr.type = 'kl';
-        model.lb.wr.name = '-KL Mixture weight';
+    if isfield(opt.mixreg, 'w0')
+        w0 = opt.mixreg.w0(1);
+    else
+        w0 = nan;
+    end
+    if isfinite(w0)
+        model.mixreg.w(1) = w0;
+        model.mixreg.w(2) = 1 - model.mixreg.w(1);
+    else
+        model.mixreg.w = [model.mixreg.a (1-model.mixreg.a)];
+        if opt.optimise.mixreg.w
+            model.lb.wr.val  = 0;
+            model.lb.wr.type = 'kl';
+            model.lb.wr.name = '-KL Mixture weight';
+        end
     end
     
     % Residual precision
