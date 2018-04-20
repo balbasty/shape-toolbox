@@ -99,6 +99,9 @@ function opt = pgva_model_default(opt)
     if ~isfield(opt.mixreg, 'n0')
         opt.mixreg.n0 = 1e-4;
     end
+    if ~isfield(opt.mixreg, 'w0')
+        opt.mixreg.w0 = linspace(0.1, 1, 10);
+    end
     
     % ---------------------------------------------------------------------
     % Template

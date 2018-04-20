@@ -230,6 +230,7 @@ function [model, dat, opt] = pgva_model(varargin)
         model.q.active  = true;
         model.v.active  = true;
         model.pg.active = true;
+        model.vl.active = false;
     end
     
     % ---------------------------------------------------------------------
@@ -280,12 +281,28 @@ function [model, dat, opt] = pgva_model(varargin)
             elseif (opt.optimise.pg.w || opt.optimise.z.z) && ~model.pg.active
                 model.pg.active = true;
                 fprintf('%10s | %10s\n', 'Activate', 'PG');
+            elseif opt.optimise.v.l  && ~model.vl.active
+                model.vl.active = true;
+                fprintf('%10s | %10s\n', 'Activate', 'Lambda');
             else
                 fprintf('Converged :D\n');
                 break
             end
         end
         model.emit = emit;
+        
+        if isfield(opt.mixreg, 'w0')
+            w0 = opt.mixreg.w0(min(emit, numel(opt.mixreg.w0)));
+            if isfinite(w0)
+                old_w = model.mixreg.w(1);
+                model.mixreg.w(1) = w0;
+                model.mixreg.w(2) = 1 - model.mixreg.w(1);
+                if opt.ui.verbose, fprintf('%10s | %10s | %8.6g -> %8.6g\n', 'Mix W', '', old_w, model.mixreg.w(1)); end
+                [dat, model] = pgva_batch('LB', 'mixture', dat, model, opt);
+                model = updateLowerBound(model);
+                pgva_plot_all(model, opt);
+            end
+        end
         
         % -----------------------------------------------------------------
         %    Affine
@@ -347,7 +364,7 @@ function [model, dat, opt] = pgva_model(varargin)
             
             % Update precision
             % ----------------
-            if opt.optimise.v.l
+            if opt.optimise.v.l && model.vl.active
                 old_l = model.v.l;
                 K = 3*prod(opt.tpl.lat);
                 model.v.n = opt.v.n0 + model.mixreg.w(1) * (opt.v.N+opt.f.N);
@@ -524,8 +541,8 @@ function [model, dat, opt] = pgva_model(varargin)
                 rho1 = dg;
                 rho2 = -dg;
                 for n=1:numel(dat)
-                    rho1 = rho1 + dat(n).v.lb.ll1;
-                    rho2 = rho2 + dat(n).v.lb.ll2;
+                    rho1 = rho1 + dat(n).v.lb.ll1/(3*prod(opt.tpl.lat));
+                    rho2 = rho2 + dat(n).v.lb.ll2/(3*prod(opt.tpl.lat));
                 end
                 model.mixreg.w(1) = 1/(1+exp(rho2-rho1));
                 model.mixreg.w(2) = 1 - model.mixreg.w(1);
